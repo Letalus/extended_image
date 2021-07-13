@@ -11,6 +11,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:oktoast/oktoast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -32,8 +33,7 @@ class ImageEditorDemo extends StatefulWidget {
 }
 
 class _ImageEditorDemoState extends State<ImageEditorDemo> {
-  final GlobalKey<ExtendedImageEditorState> editorKey =
-      GlobalKey<ExtendedImageEditorState>();
+  final GlobalKey<ExtendedImageEditorState> editorKey = GlobalKey<ExtendedImageEditorState>();
   final GlobalKey<PopupMenuButtonState<EditorCropLayerPainter>> popupMenuKey =
       GlobalKey<PopupMenuButtonState<EditorCropLayerPainter>>();
   final List<AspectRatioItem> _aspectRatios = <AspectRatioItem>[
@@ -65,7 +65,7 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
         actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.photo_library),
-            onPressed: _getImage,
+            onPressed: () => _getImage(),
           ),
           IconButton(
             icon: const Icon(Icons.done),
@@ -81,13 +81,14 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
       ),
       body: Column(children: <Widget>[
         Expanded(
-          child: _memoryImage != null
-              ? ExtendedImage.memory(
-                  _memoryImage!,
+          child: _fileImage != null
+              ? ExtendedImage.file(
+                  _fileImage!,
                   fit: BoxFit.contain,
                   mode: ExtendedImageMode.editor,
                   enableLoadState: true,
                   extendedImageEditorKey: editorKey,
+                  maxBytes: 500<<10,
                   initEditorConfigHandler: (ExtendedImageState? state) {
                     return EditorConfig(
                       maxScale: 8.0,
@@ -153,8 +154,7 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
                                 scrollDirection: Axis.horizontal,
                                 padding: const EdgeInsets.all(20.0),
                                 itemBuilder: (_, int index) {
-                                  final AspectRatioItem item =
-                                      _aspectRatios[index];
+                                  final AspectRatioItem item = _aspectRatios[index];
                                   return GestureDetector(
                                     child: AspectRatioWidget(
                                       aspectRatio: item.value,
@@ -326,8 +326,7 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
                       children: <Widget>[
                         const Text(
                           'select library to crop',
-                          style: TextStyle(
-                              fontSize: 24.0, fontWeight: FontWeight.bold),
+                          style: TextStyle(fontSize: 24.0, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(
                           height: 20.0,
@@ -339,14 +338,12 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
                                   text: 'Image',
                                   style: const TextStyle(
                                       color: Colors.blue,
-                                      decorationStyle:
-                                          TextDecorationStyle.solid,
+                                      decorationStyle: TextDecorationStyle.solid,
                                       decorationColor: Colors.blue,
                                       decoration: TextDecoration.underline),
                                   recognizer: TapGestureRecognizer()
                                     ..onTap = () {
-                                      launch(
-                                          'https://github.com/brendan-duncan/image');
+                                      launch('https://github.com/brendan-duncan/image');
                                     }),
                               const TextSpan(
                                   text:
@@ -360,18 +357,15 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
                                   text: 'ImageEditor',
                                   style: const TextStyle(
                                       color: Colors.blue,
-                                      decorationStyle:
-                                          TextDecorationStyle.solid,
+                                      decorationStyle: TextDecorationStyle.solid,
                                       decorationColor: Colors.blue,
                                       decoration: TextDecoration.underline),
                                   recognizer: TapGestureRecognizer()
                                     ..onTap = () {
-                                      launch(
-                                          'https://github.com/fluttercandies/flutter_image_editor');
+                                      launch('https://github.com/fluttercandies/flutter_image_editor');
                                     }),
                               const TextSpan(
-                                  text:
-                                      '(Native library) support android/ios, crop flip rotate. It\'s faster.')
+                                  text: '(Native library) support android/ios, crop flip rotate. It\'s faster.')
                             ],
                           )
                         ])),
@@ -422,6 +416,7 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
     if (_cropping) {
       return;
     }
+
     String msg = '';
     try {
       _cropping = true;
@@ -432,8 +427,7 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
 
       /// native library
       if (useNative) {
-        fileData = await cropImageDataWithNativeLibrary(
-            state: editorKey.currentState!);
+        fileData = await cropImageDataWithNativeLibrary(state: editorKey.currentState!);
       } else {
         ///delay due to cropImageDataWithDartLibrary is time consuming on main thread
         ///it will block showBusyingDialog
@@ -441,11 +435,9 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
         //await Future.delayed(Duration(milliseconds: 200));
 
         ///if you don't want to block ui, use compute/isolate,but it costs more time.
-        fileData =
-            await cropImageDataWithDartLibrary(state: editorKey.currentState!);
+        fileData = await cropImageDataWithDartLibrary(state: editorKey.currentState!);
       }
-      final String? filePath =
-          await ImageSaver.save('extended_image_cropped_image.jpg', fileData!);
+      final String? filePath = await ImageSaver.save('extended_image_cropped_image.jpg', fileData!);
       // var filePath = await ImagePickerSaver.saveFile(fileData: fileData);
 
       msg = 'save image : $filePath';
@@ -459,9 +451,12 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
     _cropping = false;
   }
 
-  Uint8List? _memoryImage;
+  File? _fileImage;
+
   Future<void> _getImage() async {
-    _memoryImage = await pickImage(context);
+    PickedFile? result = await ImagePicker().getImage(source: ImageSource.gallery);
+    if (result == null) return;
+    _fileImage = File(result.path);
     //when back to current page, may be editorKey.currentState is not ready.
     Future<void>.delayed(const Duration(milliseconds: 200), () {
       setState(() {
@@ -473,9 +468,9 @@ class _ImageEditorDemoState extends State<ImageEditorDemo> {
 
 class CustomEditorCropLayerPainter extends EditorCropLayerPainter {
   const CustomEditorCropLayerPainter();
+
   @override
-  void paintCorners(
-      Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
+  void paintCorners(Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
     final Paint paint = Paint()
       ..color = painter.cornerColor
       ..style = PaintingStyle.fill;
@@ -492,14 +487,12 @@ class CircleEditorCropLayerPainter extends EditorCropLayerPainter {
   const CircleEditorCropLayerPainter();
 
   @override
-  void paintCorners(
-      Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
+  void paintCorners(Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
     // do nothing
   }
 
   @override
-  void paintMask(
-      Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
+  void paintMask(Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
     final Rect rect = Offset.zero & size;
     final Rect cropRect = painter.cropRect;
     final Color maskColor = painter.maskColor;
@@ -509,14 +502,12 @@ class CircleEditorCropLayerPainter extends EditorCropLayerPainter {
         Paint()
           ..style = PaintingStyle.fill
           ..color = maskColor);
-    canvas.drawCircle(cropRect.center, cropRect.width / 2.0,
-        Paint()..blendMode = BlendMode.clear);
+    canvas.drawCircle(cropRect.center, cropRect.width / 2.0, Paint()..blendMode = BlendMode.clear);
     canvas.restore();
   }
 
   @override
-  void paintLines(
-      Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
+  void paintLines(Canvas canvas, Size size, ExtendedImageCropLayerPainter painter) {
     final Rect cropRect = painter.cropRect;
     if (painter.pointerDown) {
       canvas.save();

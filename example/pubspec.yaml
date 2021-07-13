@@ -38,6 +38,8 @@ dependencies:
   url_launcher: any
   vm_service: any
   wechat_assets_picker: any
+  image_picker: any
+  permission_handler: any
 
 dependency_overrides:
   extended_image:
